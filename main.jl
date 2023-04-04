@@ -1,3 +1,10 @@
+using GLPK
+
+⊕(cost_matrix::Matrix{Int64}, B::Matrix{Int64})::Int64 = sum(cost_matrix[1:end-1, 1:end-1] .* B[1:end-1, 1:end-1])
+
+
+cost(A::Matrix{Int64}, B::Matrix{Int64})::Int64 = A ⊕ B
+
 function next(B::Matrix{Int64},
     d::Tuple{Int64,Int64},
     n::Int64,
@@ -11,7 +18,7 @@ function next(B::Matrix{Int64},
     min_value, next_index
 end
 
-function algorithm(A::Matrix{Int64}, debug::Bool=false)
+function find_initial_solution(A::Matrix{Int64}, debug::Bool=false)
     n, m = size(A)
     B::Matrix{Int64} = zeros(n, m)
     B[end, 1:end] = A[end, 1:end]
@@ -34,16 +41,53 @@ function algorithm(A::Matrix{Int64}, debug::Bool=false)
     return B
 end
 
-⊕(cost_matrix::Matrix{Int64}, B::Matrix{Int64})::Int64 = sum(cost_matrix[1:end-1, 1:end-1] .* B[1:end-1, 1:end-1])
+function decomposition(A::Matrix{Int64}, B::Matrix{Int64}, debug::Bool=false)::Tuple{Vector{Float64},Vector{Float64}}
+    n, m = size(A)
+    u, v = zeros(n), zeros(m)
+    # initialiser le modèle d'optimisation
+    model = Model(GLPK.Optimizer)
+    # définir les variables de décision
+    @variable(model, u[1:n])
+    @variable(model, v[1:m])
+    # définir la contrainte initiale u[1] = 0
+    @constraint(model, u[1] == 0)
+    # définir les contraintes
+    for i in 1:n
+        for j in 1:m
+            if B[i, j] != 0
+                @constraint(model, C[i, j] == u[i] + v[j])
+            end
+        end
+    end
+    optimize!(model)
+    debug && println("u = ", value.(u))
+    debug && println("v = ", value.(v))
+    value.(u), value.(v)
+end
 
+function rate(A::Matrix{Int64}, u::Vector{Float64}, v::Vector{Float64}, debug::Bool=false)::Matrix{Int64}
+    n, m = size(A)
+    rate_matrix::Matrix{Int64} = zeros(n, m)
+    for i in 1:n
+        for j in 1:m
+            if A[i, j] == 0
+                rate_matrix[i, j] = A[i, j] - (u[i] + v[j])
+            end
+        end
+    end
+    return rate_matrix
+end
 function main()
-    A::Matrix{Int64} = [
-        10 14 8 20
-        12 15 10 30
-        22 32 16 40
-        40 30 20 90
+
+    C::Matrix{Int64} = [
+        147 121 344 552 450
+        241 153 102 312 450
+        451 364 557 285 750
+        400 450 550 250 1650
     ]
-    A ⊕ algorithm(A, true) 
+    # algorithm(A, true)
+    B = find_initial_solution(C, true)
+    @show decomposition(C[1:end-1, 1:end-1], B[1:end-1, 1:end-1], true)
 end
 
 main()

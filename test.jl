@@ -43,7 +43,9 @@ include("main.jl")
 
     for (key, value) in cases
         @testset "Test case $key" begin
-            @test algorithm(value) == true_answer[key]
+            @test find_initial_solution(value) == true_answer[key]
         end
     end
 end
+
+"done"
